@@ -52,7 +52,7 @@ func (w *Watcher) initFSWatcher() error {
 
 /*NewFromJSON creates a watcher from a json definition */
 func NewFromJSON(jsonContents []byte) (*Watcher, error) {
-	w := new(Watcher)
+	w := &Watcher{}
 	err := json.Unmarshal(jsonContents, &w)
 	if err != nil {
 		return nil, err
