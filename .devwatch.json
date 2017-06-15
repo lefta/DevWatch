@@ -1,0 +1,8 @@
+{
+  "actions": [
+    {
+      "build": "go build -o DevWatch main.go",
+      "pattern": "*.go"
+    }
+  ]
+}
