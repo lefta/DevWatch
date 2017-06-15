@@ -90,27 +90,27 @@ func (a *Action) Exec() error {
 }
 
 /*Kill the action */
-func (a *Action) Kill() {
-	//TODO Does not seem to work?
-	if a.Run != "" && a.cmd != nil {
-		cmd := a.cmd
-		a.cmd = nil
-
+func (a *Action) Kill() bool {
+	if a.cmd != nil {
 		// Give the process a chance to exit gracefully
-		if cmd.Process.Signal(syscall.SIGTERM) != nil {
+		if a.cmd.Process.Signal(syscall.SIGTERM) != nil {
 			// U don't wanna stop? As u want...
-			cmd.Process.Kill()
+			err := a.cmd.Process.Kill()
+			if err != nil {
+				fmt.Println("Fatal: Failed to kill program:", err)
+				os.Exit(1)
+			}
 		}
+		return true
 	}
+
+	return false
 }
 
 /*Watch the action command for its exit status, sending it to statusChannel. Sends nothing if the
   action is killed and nil on successful exit */
 func (a *Action) Watch(statusChannel *chan error) {
 	if a.cmd != nil {
-		err := a.cmd.Wait()
-		if a.cmd != nil {
-			*statusChannel <- err
-		}
+		*statusChannel <- a.cmd.Wait()
 	}
 }

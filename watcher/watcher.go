@@ -98,7 +98,12 @@ func (w *Watcher) handleDirEvent(ev fsnotify.Event) {
 func (w *Watcher) runActions(ev *fsnotify.Event) {
 	for i := range w.Actions {
 		if ev == nil || w.Actions[i].Matches(ev.Name) {
-			w.Actions[i].Kill()
+			if w.Actions[i].Kill() {
+				status := <-w.childStatus
+				if w.Debug {
+					fmt.Println("Debug:", status)
+				}
+			}
 
 			err := w.Actions[i].Exec()
 			if err != nil {
