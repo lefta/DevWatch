@@ -91,7 +91,7 @@ func (a *Action) Exec() error {
 
 /*Kill the action */
 func (a *Action) Kill() bool {
-	if a.cmd != nil {
+	if a.cmd != nil && !a.cmd.ProcessState.Exited() {
 		// Give the process a chance to exit gracefully
 		if a.cmd.Process.Signal(syscall.SIGTERM) != nil {
 			// U don't wanna stop? As u want...
