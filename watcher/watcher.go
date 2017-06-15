@@ -18,7 +18,7 @@ type Watcher struct {
 	Debug   bool
 	/* Generated vars */
 	dirs        []string
-	dirWatcher  *fsnotify.Watcher
+	dirWatcher  *batcher
 	childStatus chan error
 }
 
@@ -26,7 +26,7 @@ func (w *Watcher) initFSWatcher() error {
 	w.childStatus = make(chan error)
 
 	var err error
-	w.dirWatcher, err = fsnotify.NewWatcher()
+	w.dirWatcher, err = newBatcher()
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (w *Watcher) initFSWatcher() error {
 				fmt.Println("Debug: Watching", path)
 			}
 			w.dirs = append(w.dirs, path)
-			err = w.dirWatcher.Add(path)
+			err = w.dirWatcher.watcher.Add(path)
 			return err
 		}
 
@@ -64,7 +64,7 @@ func NewFromJSON(jsonContents []byte) (*Watcher, error) {
 
 /*Destroy resources that need to */
 func (w *Watcher) Destroy() {
-	w.dirWatcher.Close()
+	w.dirWatcher.close()
 }
 
 func printDebug(event fsnotify.Event) {
@@ -95,25 +95,40 @@ func (w *Watcher) handleDirEvent(ev fsnotify.Event) {
 	fmt.Println("Unimplemented: Directory event")
 }
 
-func (w *Watcher) runActions(ev *fsnotify.Event) {
-	for i := range w.Actions {
-		if ev == nil || w.Actions[i].Matches(ev.Name) {
-			if w.Actions[i].Kill() {
-				status := <-w.childStatus
-				if w.Debug {
-					fmt.Println("Debug:", status)
+func (w *Watcher) runActions(evs []fsnotify.Event) {
+	// Compute needed actions
+	actions := make(map[int]struct{})
+	if evs == nil {
+		for i := range w.Actions {
+			actions[i] = struct{}{}
+		}
+	} else {
+		for _, ev := range evs {
+			for i := range w.Actions {
+				if w.Actions[i].Matches(ev.Name) {
+					actions[i] = struct{}{}
 				}
 			}
-
-			err := w.Actions[i].Exec()
-			if err != nil {
-				fmt.Println(err.Error() + ", waiting for file changes to retry...")
-				// Do not execute next actions in case of failure
-				break
-			}
-
-			go w.Actions[i].Watch(&w.childStatus)
 		}
+	}
+
+	// Run actions
+	for i := range actions {
+		if w.Actions[i].Kill() {
+			status := <-w.childStatus
+			if w.Debug {
+				fmt.Println("Debug:", status)
+			}
+		}
+
+		err := w.Actions[i].Exec()
+		if err != nil {
+			fmt.Println(err.Error() + ", waiting for file changes to retry...")
+			// Do not execute next actions in case of failure
+			break
+		}
+
+		go w.Actions[i].Watch(&w.childStatus)
 	}
 }
 
@@ -123,18 +138,20 @@ func (w *Watcher) Run() {
 
 	for {
 		select {
-		case ev := <-w.dirWatcher.Events:
-			if w.Debug {
-				printDebug(ev)
+		case evs := <-w.dirWatcher.events:
+			for _, ev := range evs {
+				if w.Debug {
+					printDebug(ev)
+				}
+
+				if isDir(ev.Name) {
+					w.handleDirEvent(ev)
+				}
 			}
 
-			if isDir(ev.Name) {
-				w.handleDirEvent(ev)
-			} else {
-				w.runActions(&ev)
-			}
+			w.runActions(evs)
 
-		case err := <-w.dirWatcher.Errors:
+		case err := <-w.dirWatcher.watcher.Errors:
 			fmt.Println("Error:", err)
 
 		case err := <-w.childStatus:
