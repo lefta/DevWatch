@@ -41,6 +41,8 @@ func newCommand(cmdString string) *exec.Cmd {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
 	return cmd
 }
 
@@ -91,15 +93,12 @@ func (a *Action) Exec() error {
 
 /*Kill the action */
 func (a *Action) Kill() bool {
-	if a.cmd != nil && !a.cmd.ProcessState.Exited() {
-		// Give the process a chance to exit gracefully
-		if a.cmd.Process.Signal(syscall.SIGTERM) != nil {
-			// U don't wanna stop? As u want...
-			err := a.cmd.Process.Kill()
-			if err != nil {
-				fmt.Println("Fatal: Failed to kill program:", err)
-				os.Exit(1)
-			}
+	if a.cmd != nil && (a.cmd.ProcessState == nil || !a.cmd.ProcessState.Exited()) {
+		// Yay, we have to do it this dirty way, 'cause `go run` makes orphans...
+		err := syscall.Kill(-a.cmd.Process.Pid, syscall.SIGKILL)
+		if err != nil {
+			fmt.Println("Fatal: Failed to kill program:", err)
+			os.Exit(1)
 		}
 		return true
 	}
