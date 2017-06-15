@@ -2,9 +2,10 @@ package watcher
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/fatih/color"
 
 	fsnotify "gopkg.in/fsnotify.v1"
 
@@ -39,7 +40,7 @@ func (w *Watcher) initFSWatcher() error {
 
 		if f.IsDir() {
 			if w.Debug {
-				fmt.Println("Debug: Watching", path)
+				color.Magenta("Watching", path)
 			}
 			w.dirs = append(w.dirs, path)
 			err = w.dirWatcher.watcher.Add(path)
@@ -69,15 +70,15 @@ func (w *Watcher) Destroy() {
 
 func printDebug(event fsnotify.Event) {
 	if event.Op&fsnotify.Create == fsnotify.Create {
-		fmt.Println("Debug: Created", event.Name)
+		color.Magenta("Created", event.Name)
 	} else if event.Op&fsnotify.Rename == fsnotify.Rename {
-		fmt.Println("Debug: Renamed", event.Name)
+		color.Magenta("Renamed", event.Name)
 	} else if event.Op&fsnotify.Write == fsnotify.Write {
-		fmt.Println("Debug: Written", event.Name)
+		color.Magenta("Written", event.Name)
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove {
-		fmt.Println("Debug: Removed", event.Name)
+		color.Magenta("Removed", event.Name)
 	} else {
-		fmt.Println("Debug: Unhandled", event)
+		color.Magenta("Unhandled", event)
 	}
 }
 
@@ -92,7 +93,7 @@ func isDir(path string) bool {
 
 func (w *Watcher) handleDirEvent(ev fsnotify.Event) {
 	//TODO
-	fmt.Println("Unimplemented: Directory event")
+	color.Magenta("Unimplemented: Directory event")
 }
 
 func (w *Watcher) runActions(evs []fsnotify.Event) {
@@ -117,13 +118,13 @@ func (w *Watcher) runActions(evs []fsnotify.Event) {
 		if w.Actions[i].Kill() {
 			status := <-w.childStatus
 			if w.Debug {
-				fmt.Println("Debug:", status)
+				color.Magenta(status.Error())
 			}
 		}
 
 		err := w.Actions[i].Exec()
 		if err != nil {
-			fmt.Println(err.Error() + ", waiting for file changes to retry...")
+			color.Red(err.Error() + ", waiting for file changes to retry...")
 			// Do not execute next actions in case of failure
 			break
 		}
@@ -152,11 +153,11 @@ func (w *Watcher) Run() {
 			w.runActions(evs)
 
 		case err := <-w.dirWatcher.watcher.Errors:
-			fmt.Println("Error:", err)
+			color.Red(err.Error())
 
 		case err := <-w.childStatus:
 			if err != nil {
-				fmt.Println("Program crashed, waiting for file changes...")
+				color.Red("Program crashed, waiting for file changes...")
 			}
 		}
 	}

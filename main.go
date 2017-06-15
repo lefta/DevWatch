@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
+
+	"github.com/fatih/color"
 
 	"./watcher"
 )
@@ -23,7 +24,7 @@ func getConfig() []byte {
 	file := getConfigFile()
 	json, err := ioutil.ReadFile(file)
 	if err != nil {
-		fmt.Println(err)
+		color.Red(err.Error())
 		os.Exit(1)
 	}
 
@@ -35,7 +36,7 @@ func main() {
 
 	w, err := watcher.NewFromJSON(json)
 	if err != nil {
-		fmt.Println(err)
+		color.Red(err.Error())
 		os.Exit(1)
 	}
 	defer w.Destroy()

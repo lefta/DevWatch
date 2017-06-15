@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/fatih/color"
 )
 
 /*Action stores action details */
@@ -26,7 +28,7 @@ func (a *Action) Matches(path string) bool {
 	matched, err := filepath.Match(a.Pattern, file)
 
 	if err != nil {
-		fmt.Println("Error:", err)
+		color.Red(err.Error())
 		return false
 	}
 
@@ -47,7 +49,7 @@ func newCommand(cmdString string) *exec.Cmd {
 }
 
 func (a *Action) build() error {
-	fmt.Println("Building", a.Pattern)
+	color.Green("Building " + a.Pattern)
 	fmt.Println(">", a.Build)
 
 	cmd := newCommand(a.Build)
@@ -61,7 +63,7 @@ func (a *Action) build() error {
 }
 
 func (a *Action) run() error {
-	fmt.Println("Running", a.Run)
+	color.Green("Running " + a.Run)
 
 	a.cmd = newCommand(a.Run)
 
@@ -97,7 +99,7 @@ func (a *Action) Kill() bool {
 		// Yay, we have to do it this dirty way, 'cause `go run` makes orphans...
 		err := syscall.Kill(-a.cmd.Process.Pid, syscall.SIGKILL)
 		if err != nil {
-			fmt.Println("Fatal: Failed to kill program:", err)
+			color.Red("Fatal: Failed to kill program:", err)
 			os.Exit(1)
 		}
 		return true
