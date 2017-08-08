@@ -94,14 +94,15 @@ func (a *Action) Exec() error {
 }
 
 /*Kill the action */
-func (a *Action) Kill() bool {
+func (a *Action) Kill(sig syscall.Signal) bool {
 	if a.cmd != nil && (a.cmd.ProcessState == nil || !a.cmd.ProcessState.Exited()) {
 		// Yay, we have to do it this dirty way, 'cause `go run` makes orphans...
-		err := syscall.Kill(-a.cmd.Process.Pid, syscall.SIGKILL)
+		err := syscall.Kill(-a.cmd.Process.Pid, sig)
 		if err != nil {
 			color.Red("Fatal: Failed to kill program:", err)
 			os.Exit(1)
 		}
+		a.cmd = nil
 		return true
 	}
 

@@ -2,8 +2,13 @@ package watcher
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"strings"
+	"syscall"
 
 	"github.com/fatih/color"
 
@@ -17,14 +22,18 @@ type Watcher struct {
 	/* Configured vars */
 	Actions []action.Action
 	Debug   bool
+	//TODO Other hooks
+	PostHooks []string
 	/* Generated vars */
 	dirs        []string
 	dirWatcher  *batcher
 	childStatus chan error
+	postCmds    []*exec.Cmd
 }
 
 func (w *Watcher) initFSWatcher() error {
 	w.childStatus = make(chan error)
+	w.postCmds = make([]*exec.Cmd, len(w.PostHooks))
 
 	var err error
 	w.dirWatcher, err = newBatcher()
@@ -63,9 +72,26 @@ func NewFromJSON(jsonContents []byte) (*Watcher, error) {
 	return w, err
 }
 
+func (w *Watcher) signal(sig syscall.Signal) {
+	fmt.Println(sig)
+	for _, cmd := range w.postCmds {
+		if cmd != nil && (cmd.ProcessState == nil || !cmd.ProcessState.Exited()) {
+			// Yay, we have to do it this dirty way, 'cause `go run` makes orphans...
+			err := syscall.Kill(cmd.Process.Pid, sig)
+			if err != nil {
+				color.Red("Failed to kill hook:", err)
+			}
+		}
+	}
+	for _, a := range w.Actions {
+		a.Kill(sig)
+	}
+}
+
 /*Destroy resources that need to */
 func (w *Watcher) Destroy() {
 	w.dirWatcher.close()
+	w.signal(syscall.SIGINT)
 }
 
 func printDebug(event fsnotify.Event) {
@@ -115,7 +141,7 @@ func (w *Watcher) runActions(evs []fsnotify.Event) {
 
 	// Run actions
 	for i := range actions {
-		if w.Actions[i].Kill() {
+		if w.Actions[i].Kill(syscall.SIGINT) {
 			status := <-w.childStatus
 			if w.Debug {
 				color.Magenta(status.Error())
@@ -133,9 +159,39 @@ func (w *Watcher) runActions(evs []fsnotify.Event) {
 	}
 }
 
+func (w *Watcher) runHooks() {
+	if w.PostHooks == nil {
+		return
+	}
+
+	color.Green("Running hooks...")
+	for i, cmd := range w.PostHooks {
+		fmt.Println(">", cmd)
+
+		argv := strings.Split(cmd, " ")
+		w.postCmds[i] = exec.Command(argv[0])
+		w.postCmds[i].Args = argv
+
+		w.postCmds[i].Stdout = os.Stdout
+		w.postCmds[i].Stderr = os.Stderr
+
+		w.postCmds[i].SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+		err := w.postCmds[i].Start()
+		if err != nil {
+			color.Red("Integration failed")
+		}
+		//TODO watching
+	}
+}
+
 /*Run watches */
 func (w *Watcher) Run() {
 	w.runActions(nil)
+	w.runHooks()
+
+	sigChannel := make(chan os.Signal, 1)
+	signal.Notify(sigChannel, os.Interrupt)
 
 	for {
 		select {
@@ -159,6 +215,11 @@ func (w *Watcher) Run() {
 			if err != nil {
 				color.Red("Program crashed, waiting for file changes...")
 			}
+
+		case sig := <-sigChannel:
+			w.signal(sig.(syscall.Signal))
+			w.Destroy()
+			os.Exit(0)
 		}
 	}
 }
