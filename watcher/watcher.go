@@ -73,7 +73,6 @@ func NewFromJSON(jsonContents []byte) (*Watcher, error) {
 }
 
 func (w *Watcher) signal(sig syscall.Signal) {
-	fmt.Println(sig)
 	for _, cmd := range w.postCmds {
 		if cmd != nil && (cmd.ProcessState == nil || !cmd.ProcessState.Exited()) {
 			// Yay, we have to do it this dirty way, 'cause `go run` makes orphans...
