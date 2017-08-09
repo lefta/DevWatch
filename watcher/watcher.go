@@ -90,7 +90,7 @@ func (w *Watcher) signal(sig syscall.Signal) {
 /*Destroy resources that need to */
 func (w *Watcher) Destroy() {
 	w.dirWatcher.close()
-	w.signal(syscall.SIGINT)
+	w.signal(syscall.SIGTERM)
 }
 
 func printDebug(event fsnotify.Event) {
@@ -140,7 +140,7 @@ func (w *Watcher) runActions(evs []fsnotify.Event) {
 
 	// Run actions
 	for i := range actions {
-		if w.Actions[i].Kill(syscall.SIGINT) {
+		if w.Actions[i].Kill(syscall.SIGTERM) {
 			status := <-w.childStatus
 			if w.Debug {
 				color.Magenta(status.Error())
