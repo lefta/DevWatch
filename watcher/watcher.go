@@ -24,6 +24,7 @@ type Watcher struct {
 	Debug   bool
 	//TODO Other hooks
 	PostHooks []string
+	Exclude   []string
 	/* Generated vars */
 	dirs        []string
 	dirWatcher  *batcher
@@ -45,6 +46,12 @@ func (w *Watcher) initFSWatcher() error {
 		// Propagate error
 		if err != nil {
 			return err
+		}
+
+		for _, exclude := range w.Exclude {
+			if strings.HasPrefix(path, exclude) {
+				return nil
+			}
 		}
 
 		if f.IsDir() {
