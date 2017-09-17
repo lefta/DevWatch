@@ -99,8 +99,7 @@ func (a *Action) Kill(sig syscall.Signal) bool {
 		// Yay, we have to do it this dirty way, 'cause `go run` makes orphans...
 		err := syscall.Kill(-a.cmd.Process.Pid, sig)
 		if err != nil {
-			color.Red("Fatal: Failed to kill program:", err)
-			os.Exit(1)
+			return false
 		}
 		a.cmd = nil
 		return true
