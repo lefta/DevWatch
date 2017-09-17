@@ -24,7 +24,7 @@ func getConfig() []byte {
 	file := getConfigFile()
 	json, err := ioutil.ReadFile(file)
 	if err != nil {
-		color.Red(err.Error())
+		color.Red("Failed to read config: " + err.Error())
 		os.Exit(1)
 	}
 
@@ -36,7 +36,7 @@ func main() {
 
 	w, err := watcher.NewFromJSON(json)
 	if err != nil {
-		color.Red(err.Error())
+		color.Red("Failed to create watcher: " + err.Error())
 		os.Exit(1)
 	}
 	defer w.Destroy()
